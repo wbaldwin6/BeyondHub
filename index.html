@@ -1,0 +1,240 @@
+<html>
+	<head>
+		<title>Beyond Hub</title>
+		<style>
+			body {
+				background-color: black;
+				margin: 0 0 0 0;
+			}
+			div {
+				display: block;
+				float: left;
+				height: auto;
+				width: 100%;
+				background-color: black;
+				color: white;
+			}
+			div.serverlisting {
+				padding-left: 5px;
+				width: 90%;
+				border: solid;
+				border-width: 2px;
+				border-color: white;
+				margin: 5px;
+				border-radius: 5px;
+			}
+			h2.title{
+				display: inline-block;
+				width: 50%;
+				float: left;
+			}
+			div.buttonarea{
+				display: inline-block;
+				text-align: right;
+				width: 50%;
+			}
+			button {
+				margin-top: 5px;
+				margin-right: 5px;
+			}
+			div.verifybutton {
+				cursor: pointer;
+				-webkit-user-select: none;
+				-moz-user-select: none;
+				-ms-user-select: none;
+				user-select: none;
+				text-align: center;
+				float: right;
+				width: auto;
+				margin-top: 5px;
+				margin-right: 5px;
+				background: #7289DA;
+				padding: 0 20px;
+				line-height: 35px;
+				color: #fff;
+				font-family: 'Helvetica', 'Arial', sans-sefir;
+				font-size: 20px;
+				display: block;
+				text-decoration: none;
+				border-radius: 3px;
+			}
+			.discordbutton {
+				background: #7289DA;
+				padding: 0 20px;
+				line-height: 35px;
+				color: #fff;
+				font-family: 'Helvetica', 'Arial', sans-sefir;
+				font-size: 20px;
+				display: block;
+				text-decoration: none;
+				border-radius: 3px;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="main"></div>
+
+		<script src="/socket.io/socket.io.js"></script>
+		<script src="http://www.myersdaily.org/joseph/javascript/md5.js"></script>
+		<script src="https://unpkg.com/react@15.3.2/dist/react.js"></script>
+		<script src="https://unpkg.com/react-dom@15.3.2/dist/react-dom.js"></script>
+		<script src="https://unpkg.com/babel-standalone@6.26.0/babel.min.js"></script>
+		<script type="text/babel">
+		var socket = io();
+
+		var Outercontainer = React.createClass({
+			getInitialState: function(){
+				return {unverified: {}, verified: {}, loggedin: false};
+			},
+
+			componentDidMount: function(){
+				var that = this;
+				this.props.socket.on("Serverlist", function (unvlist, verlist){
+					that.setState({unverified: unvlist, verified: verlist});
+				});
+				if(document.cookie.match(/[; ^]?token=([^\s;]*)/)[1]){//if we have a token saved, get a verified ID.
+					socket.emit("DiscordLogin", document.cookie.match(/[; ^]?token=([^\s;]*)/)[1], function (res){
+						if(res.message){
+							console.log(res.message);
+						} else {//ID is the response.
+							that.setState({discordid: res});
+						}
+					});
+				}
+				window.onkeydown = function(e){
+					if(!that.state.showlogin && e.keyCode == 70 && e.shiftKey){
+						that.setState({showlogin: true});
+					}
+				};
+			},
+
+			loggedin: function(){
+				this.setState({loggedin: true, showlogin: false});
+			},
+
+			render: function(){
+				var playerlist;
+				var players;
+				var loginarea = (<Loginarea login={this.loggedin}/>);
+
+				var verlist = [];
+				var verified = this.state.verified;
+				for (var server in verified){
+					playerlist = '';
+					players = 0;
+					for(var player in verified[server].playerlist){
+						players++;
+						if(playerlist){playerlist += ', ';}
+						playerlist += player;
+					}
+					verlist.push(<div data={players} key={verlist.length} className="serverlisting"><h2 className="title"><a href={'http://'+server} target="_blank">{verified[server].title}</a></h2><Buttonarea server={server} loggedin={this.state.loggedin} serverid={verified[server].id} veri={true}/><div style={{width: '100%', marginBottom: '5px'}}><b>{players} Player{players != 1 ? 's ' : ' '}logged in:</b> {playerlist}</div></div>);
+				}
+				verlist.sort(function(a, b){return b.props.data - a.props.data});
+				var vermessage = (<div><h1>{verlist.length} Server{verlist.length != 1 ? 's ' : ' '}Online{verlist.length ? '!' : '.'}</h1></div>);
+
+				var discordlogin = (<div style={{width: 'auto', marginLeft:'5px', marginTop:'15px'}}><a title="Discord support lets you vouch for a server with your ID!" className="discordbutton" href="/login">Login through Discord</a></div>);
+
+				var unvlist = [];
+				var unvmessage = (<div><h1>Unverified Servers</h1> All servers that have sent a public ping in the last five minutes will be listed here. Any URL that sends the right values can appear here regardless of content, so <span style={{color: 'red'}}>use them at your own risk.</span></div>);
+				var unverified = this.state.unverified;
+				for (var server in unverified){
+					playerlist = '';
+					players = 0;
+					for(var player in unverified[server].playerlist){
+						players++;
+						if(playerlist){playerlist += ', ';}
+						playerlist += player;
+					}
+					unvlist.push(<div data={players} key={unvlist.length} className="serverlisting"><h2 className="title"><a href={'http://'+server} target="_blank">{unverified[server].title}</a></h2><Buttonarea server={server} loggedin={this.state.loggedin} serverid={unverified[server].id} userid={this.state.discordid}/><div style={{width: '100%', marginBottom: '5px'}}><b>{players} Player{players != 1 ? 's ' : ' '}logged in{players ? ':' : '.'}</b> {playerlist}</div></div>);
+				}
+				unvlist.sort(function(a, b){return b.props.data - a.props.data});
+				if(this.state.discordid){
+					return (
+						<div>{this.state.showlogin ? loginarea : null}{vermessage}{verlist}<br/><div><h2>Links</h2><a href='https://github.com/wbaldwin6/Beyond'>Beyond Github</a><br/><a href='https://github.com/wbaldwin6/BeyondHub'>Beyond Hub Github</a><br/><a href="https://discordapp.com/">Discord App</a></div><br/>{unvmessage}{unvlist}</div>
+					);
+				}
+				return (
+					<div>{this.state.showlogin ? loginarea : null}{vermessage}{verlist}<br/>{discordlogin}<div><h2>Links</h2><a href='https://github.com/wbaldwin6/Beyond'>Beyond Github</a><br/><a href='https://github.com/wbaldwin6/BeyondHub'>Beyond Hub Github</a><br/><a href="https://discordapp.com/">Discord App</a></div><br/>{unvmessage}{unvlist}</div>
+				);
+			}
+		});
+
+		var Loginarea = React.createClass({
+			getInitialState: function(){
+				return {loginmessage: 'Enter admin credentials.'};
+			},
+
+			login: function(e){
+				e.preventDefault();
+				var that=this;
+				var username = this.refs.username.value;
+				var password = this.refs.password.value;
+				socket.emit("login", username, md5(password), function(response){
+					if(response.code){
+						that.setState({loginmessage: response.code});
+					} else if(response == 'Success!'){
+						that.props.login();
+					} else {
+						that.setState({loginmessage: response});
+					}
+				});
+			},
+
+			enterCheck: function(e){
+				if(e.keyCode == 13){
+					if(e.target.name == 'password'){
+						this.login(e);
+					} else if(e.target.value.length >= 6) {
+						this.refs.password.focus();
+					}
+				}
+			},
+
+			render: function(){
+				return(<div style={{position: 'fixed', top:0, right:0, width: 'auto'}}>
+					{this.state.loginmessage}<br/>
+					<input type="text" name="username" ref="username" placeholder="Username" onKeyDown={this.enterCheck}/><br/>
+					<input type="text" name="password" ref="password" placeholder="Password" onKeyDown={this.enterCheck}/>
+					</div>);
+			}
+		});
+
+		var Buttonarea = React.createClass({
+			verify: function(){
+				socket.emit("verify", this.props.server, function(res){console.log(res);});
+			},
+
+			ban: function(e){
+				if(e.target.id == 'banip'){
+					this.props.socket.emit("ban", this.props.server.split(':')[0], false)
+				} else if(e.target.id == 'banid'){
+					this.props.socket.emit("ban", this.props.serverid, true);
+				}
+			},
+
+			render: function(){
+				var verify = !this.props.veri ? (<div className='verifybutton' id="verify" onClick={this.verify}>Verify Server</div>) : null;
+
+				if(this.props.loggedin){
+					return(<div className="buttonarea">
+						{verify}
+						<br/>
+						<button id="banip" onClick={this.ban}>Ban IP</button><button id="banid" onClick={this.ban}>Ban ID</button>
+						</div>);
+				} else if(this.props.userid == this.props.serverid) {
+					return(<div className="buttonarea">
+						{verify}
+						</div>);
+				} else {
+					return null;
+				}
+			}
+		});
+
+		ReactDOM.render(
+			<Outercontainer socket={socket}/>,
+			document.getElementById('main')
+		);
+		</script>
+	</body>
+</html>
